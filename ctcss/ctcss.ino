@@ -278,7 +278,7 @@ void loop() {
   // so scrolling through CTCSS values won't cause an EEPROM write.
   if (eeprom_write_check != 0) {
     eeprom_write_check++;
-    if (eeprom_write_check >= 1 * 1000 * 1000) {
+    if (eeprom_write_check >= 100 * 1000 * 1000) {
       eeprom_write_check = 0;
       eeprom_write_state();
     }
