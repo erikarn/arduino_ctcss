@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 #include "Wire.h"
 #include "Adafruit_GFX.h"
 #include "OakOLED.h"
@@ -18,7 +20,7 @@ const byte dds_out_pin = 9; // OCR1A output pin
 #define CLK_FREQ_MHZ  16 // 16MHz clock, used for OCR math
 
 // ctcss tones
-const PROGMEM float ctcssFreq[] =   {  67.0,    69.3,    71.9,    74.4,    77.0,   79.7,    82.5,    85.4,    88.5,    91.5,
+const float ctcssFreq[] =   {  67.0,    69.3,    71.9,    74.4,    77.0,   79.7,    82.5,    85.4,    88.5,    91.5,
                          94.8,    97.4,   100.0,   103.5,   107.2,  110.9,   114.8,   118.8,   123.0,   127.3, 
                         131.8,   136.5,   141.3,   146.2,   151.4,  156.7,   159.8,   162.2,   165.5,   167.9,  
                         171.3,   173.8,   177.3,   179.9,   183.5,  186.2,   189.9,   192.8,   196.6,   199.5,
@@ -39,6 +41,43 @@ volatile byte k1_button_state = 0;
 volatile byte k2_button_state = 0;
 volatile byte k3_button_state = 0;
 volatile byte k4_button_state = 0;
+
+// This is a quick counter to limit how often we're writing
+// configuration values to EEPROM.
+unsigned int eeprom_write_check = 0;
+
+void eeprom_write_state()
+{
+  EEPROM.update(0, ctcssFreqIdx);
+  EEPROM.update(1, isEnabled);
+}
+
+void
+eeprom_read_state()
+{
+  // Read the enabled/ctcss freq index.
+  // If they're not valid then initialise things to default.
+  ctcssFreqIdx = EEPROM.read(0);
+  isEnabled = EEPROM.read(1);
+
+  if (ctcssFreqIdx >= NUM_CTCSSFREQ) {
+    goto ini;
+  }
+  if (isEnabled > 1) {
+    goto ini;
+  }
+  return;
+ini:
+  isEnabled = 0;
+  ctcssFreqIdx = 0;
+}
+
+void
+eeprom_start_check()
+{
+  // Kick-start the wait check...
+  eeprom_write_check = 1;
+}
 
 void ctcsscalc()
 {
@@ -89,7 +128,7 @@ update_oscillator()
  OCR1AL = ocrL[ctcssFreqIdx];
 }
 
-// up button
+// button 1 - up button
 void k1_button_isr()
 {
    byte r;
@@ -105,6 +144,7 @@ void k1_button_isr()
 
      update_display();
      update_oscillator();
+     eeprom_start_check();
    }
    else if (r == 0 && k1_button_state == 1) {
      // released
@@ -112,7 +152,7 @@ void k1_button_isr()
    k1_button_state = r;
 }
 
-// down button
+// button 2 - down button
 void k2_button_isr()
 {
     byte r;
@@ -131,6 +171,7 @@ void k2_button_isr()
 
      update_display();
      update_oscillator();
+     eeprom_start_check();
    }
    else if (r == 0 && k2_button_state == 1) {
      // released
@@ -138,7 +179,7 @@ void k2_button_isr()
    k2_button_state = r;
 }
 
-// enable/disable button
+// button 3 - enable/disable button
 void k3_button_isr()
 {
    byte r;
@@ -153,6 +194,8 @@ void k3_button_isr()
      isEnabled = !isEnabled;
      update_display();
      update_oscillator();
+     eeprom_start_check();
+
    }
    else if (r == 0 && k3_button_state == 1) {
      // released
@@ -160,6 +203,7 @@ void k3_button_isr()
    k3_button_state = r;
 }
 
+// button 4 - PTT from radio
 void
 k4_button_isr()
 {
@@ -195,6 +239,9 @@ void setup() {
   pinMode(k2_button_pin, INPUT_PULLUP);
   pinMode(k3_button_pin, INPUT_PULLUP);
 
+  // PTT - active-high
+  pinMode(k4_button_pin, INPUT);
+
   // DDS output, the OCR1A comparison
   pinMode(dds_out_pin, OUTPUT);
   
@@ -207,6 +254,9 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(k4_button_pin), k4_button_isr, CHANGE);
 
 #endif
+
+  eeprom_read_state();
+
   update_display();
   update_oscillator();
 }
@@ -220,5 +270,18 @@ void loop() {
   k2_button_isr();
   k3_button_isr();
   k4_button_isr();
+
+  // Check to see if we have to do an EEPROM write.
+  // This is only done if the display is updated from a button press.
+  // The hack right now is to wait a million loops before writing
+  // the current state to EEPROM.  That SHOULD be a second or two,
+  // so scrolling through CTCSS values won't cause an EEPROM write.
+  if (eeprom_write_check != 0) {
+    eeprom_write_check++;
+    if (eeprom_write_check = 1 * 1000 * 1000) {
+      eeprom_write_check = 0;
+      eeprom_write_state();
+    }
+  }
 #endif
 }
