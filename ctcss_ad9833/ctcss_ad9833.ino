@@ -1,5 +1,3 @@
-#include <asserts.h>
-#include <errors.h>
 
 #include <EEPROM.h>
 #include <AD9833.h>        
@@ -20,8 +18,6 @@ const byte k4_button_pin = 5; // PTT
 const byte FNC_PIN = 4; // AD9833 enable line
 
 #define NUM_CTCSSFREQ 50
-
-#define CLK_FREQ_MHZ  16 // 16MHz clock, used for OCR math
 
 // ctcss tones
 const float ctcssFreq[] =   {  67.0,    69.3,    71.9,    74.4,    77.0,   79.7,    82.5,    85.4,    88.5,    91.5,
@@ -96,6 +92,9 @@ update_display()
      oled.print("ON");
   else
     oled.print("OFF");
+  if (eeprom_write_check != 0) {
+    oled.print("*");
+  }
 
   oled.display();
 }
@@ -103,9 +102,13 @@ update_display()
 void
 update_oscillator()
 {
+  if (isEnabled) {
   gen.ApplySignal(SINE_WAVE, REG1, ctcssFreq[ctcssFreqIdx]);
   gen.SetOutputSource(REG1);
   gen.EnableOutput(true);
+  } else {
+    gen.EnableOutput(false);
+  }
 }
 
 // button 1 - up button
@@ -121,10 +124,10 @@ void k1_button_isr()
    if (r == 1 && k1_button_state == 0) {
      // pressed
      ctcssFreqIdx = (ctcssFreqIdx + 1) % NUM_CTCSSFREQ;
-
+     
+     eeprom_start_check();
      update_display();
      update_oscillator();
-     eeprom_start_check();
    }
    else if (r == 0 && k1_button_state == 1) {
      // released
@@ -148,10 +151,9 @@ void k2_button_isr()
        ctcssFreqIdx = NUM_CTCSSFREQ-1;
      else
        ctcssFreqIdx--;
-
+     eeprom_start_check();
      update_display();
      update_oscillator();
-     eeprom_start_check();
    }
    else if (r == 0 && k2_button_state == 1) {
      // released
@@ -172,10 +174,9 @@ void k3_button_isr()
    if (r == 1 && k3_button_state == 0) {
      // pressed
      isEnabled = !isEnabled;
+     eeprom_start_check();
      update_display();
      update_oscillator();
-     eeprom_start_check();
-
    }
    else if (r == 0 && k3_button_state == 1) {
      // released
@@ -249,17 +250,20 @@ void loop() {
   k3_button_isr();
   k4_button_isr();
 
+#if 1
   // Check to see if we have to do an EEPROM write.
   // This is only done if the display is updated from a button press.
-  // The hack right now is to wait a million loops before writing
+  // The hack right now is to wait a bunch of loops before writing
   // the current state to EEPROM.  That SHOULD be a second or two,
   // so scrolling through CTCSS values won't cause an EEPROM write.
   if (eeprom_write_check != 0) {
     eeprom_write_check++;
-    if (eeprom_write_check >= (100L * 1000L * 1000L)) {
+    if (eeprom_write_check >= (50000)) {
       eeprom_write_check = 0;
       eeprom_write_state();
+      update_display();
     }
   }
+#endif
 #endif
 }
