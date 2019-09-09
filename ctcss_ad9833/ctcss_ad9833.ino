@@ -9,13 +9,23 @@
 // Note: i'm using https://github.com/netguy204/OakOLED and the oakled module which
 // doesn't have a reset line.
 
+// The Oakled is wired up to the SPI pins.
 OakOLED oled;
 
+// These lines are connected to buttons that short-to-ground.
 const byte k1_button_pin = 7; // Up
 const byte k2_button_pin = 8; // Down
 const byte k3_button_pin = 6; // Enable/disable
+
+// This is for the eventual PTT input line to gate transmitting the PL tone on/off.
+// If I get around to it, it should also be used to generate a 180 degree phase shifted
+// tone for a little interval after PTT is released to "quieten" the repeater.
+// (Don't ask; it's an old school hardware repeater PL tone decode thingy that somehow
+// persists even today..)
 const byte k4_button_pin = 5; // PTT
+
 const byte FNC_PIN = 4; // AD9833 enable line
+// Note: The AD9833 is wired up to the MOSI/CLK lines.
 
 #define NUM_CTCSSFREQ 50
 
@@ -192,9 +202,8 @@ k4_button_isr()
    // XXX TODO: debounce
    r = digitalRead(k4_button_pin);
 
-   // Invert; the board I'm using is active-low.
-   r = !r;
-   
+   // Note: PTT here is active-high, not inverted.
+   // add electronics or hack this routine if you need it inverted.
    if (r == 1 && k4_button_state == 0) {
      // pressed
      isPtt = 1;
@@ -243,6 +252,8 @@ void setup() {
 void loop() {
 #if DO_INTERRUPTS
   // XXX TODO: some halt instruction?
+  // XXX TODO: if this gets implemented, some kind of timer routine will be
+  // needed to drive the eeprom write logic.
 #else
   // Polling
   k1_button_isr();
