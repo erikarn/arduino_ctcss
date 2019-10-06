@@ -27,6 +27,8 @@ const byte k4_button_pin = 5; // PTT
 const byte FNC_PIN = 4; // AD9833 enable line
 // Note: The AD9833 is wired up to the MOSI/CLK lines.
 
+byte display_active = 0;
+
 #define NUM_CTCSSFREQ 50
 
 // ctcss tones
@@ -88,6 +90,14 @@ eeprom_start_check()
 }
 
 void
+blank_display()
+{
+  oled.clearDisplay();
+  oled.display();
+  display_active = 0;
+}
+
+void
 update_display()
 {
   oled.clearDisplay();
@@ -107,6 +117,7 @@ update_display()
   }
 
   oled.display();
+  display_active = 1;
 }
 
 void
@@ -133,8 +144,9 @@ void k1_button_isr()
    
    if (r == 1 && k1_button_state == 0) {
      // pressed
-     ctcssFreqIdx = (ctcssFreqIdx + 1) % NUM_CTCSSFREQ;
-     
+     if (display_active == 1) {
+       ctcssFreqIdx = (ctcssFreqIdx + 1) % NUM_CTCSSFREQ;
+     }
      eeprom_start_check();
      update_display();
      update_oscillator();
@@ -157,10 +169,12 @@ void k2_button_isr()
    
    if (r == 1 && k2_button_state == 0) {
      // pressed
-     if (ctcssFreqIdx == 0)
-       ctcssFreqIdx = NUM_CTCSSFREQ-1;
-     else
-       ctcssFreqIdx--;
+     if (display_active == 1) {
+       if (ctcssFreqIdx == 0)
+         ctcssFreqIdx = NUM_CTCSSFREQ-1;
+       else
+         ctcssFreqIdx--;
+     }
      eeprom_start_check();
      update_display();
      update_oscillator();
@@ -183,7 +197,9 @@ void k3_button_isr()
    
    if (r == 1 && k3_button_state == 0) {
      // pressed
-     isEnabled = !isEnabled;
+     if (display_active == 1) {
+       isEnabled = !isEnabled;
+     }
      eeprom_start_check();
      update_display();
      update_oscillator();
@@ -207,13 +223,17 @@ k4_button_isr()
    if (r == 1 && k4_button_state == 0) {
      // pressed
      isPtt = 1;
-     update_display();
+     if (display_active == 1) {
+       update_display();
+     }
      update_oscillator();
    }
    else if (r == 0 && k4_button_state == 1) {
      // released
      isPtt = 0;
-     update_display();
+     if (display_active == 1) {
+       update_display();
+     }
      update_oscillator();
    }
    k4_button_state = r;
@@ -272,7 +292,8 @@ void loop() {
     if (eeprom_write_check >= (50000)) {
       eeprom_write_check = 0;
       eeprom_write_state();
-      update_display();
+      //update_display();
+      blank_display();
     }
   }
 #endif
