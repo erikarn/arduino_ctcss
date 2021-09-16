@@ -40,8 +40,9 @@ const float ctcssFreq[] =   {  67.0,    69.3,    71.9,    74.4,    77.0,   79.7,
 };
 
 volatile unsigned char ctcssFreqIdx = 0;
-volatile byte isEnabled = 0;
-volatile byte isPtt = 0;
+volatile byte isEnabled = 0; // Whether output is enabled or not
+volatile byte isPtt = 0; // Whether PTT is asserted or not
+volatile byte doPtt = 0; // Whether we should be using PTT to flip on/off CTCSS or not
 
 // Yes, wasteful to use bytes here instead of a bitmap
 // Yes, and should refactor out the code
@@ -124,9 +125,9 @@ void
 update_oscillator()
 {
   if (isEnabled) {
-  gen.ApplySignal(SINE_WAVE, REG1, ctcssFreq[ctcssFreqIdx]);
-  gen.SetOutputSource(REG1);
-  gen.EnableOutput(true);
+    gen.ApplySignal(SINE_WAVE, REG1, ctcssFreq[ctcssFreqIdx]);
+    gen.SetOutputSource(REG1);
+    gen.EnableOutput(true);
   } else {
     gen.EnableOutput(false);
   }
